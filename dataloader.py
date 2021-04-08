@@ -1,20 +1,50 @@
 import jax
-import tensorflow_datasets as tfds
+from jax import numpy as np, random
 
+from typing import Union
+import linecache
+
+import sentencepiece as spm
 from hyperparameters import Hyperparameters
 
-def load_dataset(hypers : Hyperparameters):
-    builder = tfds.builder(hypers.dataset)
+def get_batches(hypers : Hyperparameters, key : np.ndarray, dataset_name : str):
+    sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
 
-    train      = tfds.as_numpy(builder.as_dataset(split='train'))
-    test       = tfds.as_numpy(builder.as_dataset(split='train'))
-    validation = tfds.as_numpy(builder.as_dataset(split='validation'))
+    source_filename = f'{hypers.dataset_prefix}/{dataset_name}.{hypers.language_pair[0]}'
+    target_filename = f'{hypers.dataset_prefix}/{dataset_name}.{hypers.language_pair[1]}'
 
-    return train, test, validation
+    _ = linecache.getline(source_filename, 0)
+    _ = linecache.getline(target_filename, 0)
 
-def sentencepiece_generator(dataset, language_pair) -> str:
-    dataset_iter = iter(dataset)
-    for pair in dataset_iter:
-        yield pair[language_pair[0]].decode('utf8')
-        yield pair[language_pair[1]].decode('utf8')
+    line_count = len(linecache.cache[source_filename][2])
+
+    cpus = jax.devices('cpu')
+
+    indices = jax.device_put(np.arange(line_count), cpus[0])
+    indices = random.permutation(key, indices)
+
+    for batch_start in range(0, line_count, hypers.batch_size):
+        batch_end = batch_start + hypers.batch_size
+        batch_end = np.minimum(batch_end, line_count)
+
+        sources = [process_sentence(hypers, sp, linecache.getline(source_filename, i))
+                    for i in range(batch_start, batch_end)]
+
+        targets = [process_sentence(hypers, sp, linecache.getline(target_filename, i))
+                    for i in range(batch_start, batch_end)]
+
+        sources = np.stack(sources)
+        targets = np.stack(targets)
+
+        yield sources, targets
+
+
+def process_sentence(hypers : Hyperparameters, sp : spm.SentencePieceProcessor, sentence : Union[str, bytes]):
+    sentence = sp.encode(sentence)
+    sentence = np.array(sentence)
+    padding = np.maximum(0, hypers.seq_length - sentence.shape[0])
+    sentence = np.pad(sentence, [0, padding])
+    sentence = sentence[:hypers.seq_length]
+
+    return sentence
 
