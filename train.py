@@ -85,11 +85,13 @@ for epoch in range(hypers.epochs):
 
             if len(report_times) > 1:
                 per_batch = report_times[1:].mean() / hypers.log_every
+                batches_per_epoch = 9_000_000 / hypers.batch_size
+                estimated_time = per_batch * ((batches_per_epoch - batch_num) + batches_per_epoch*(hypers.epochs - epoch - 1))
             else:
                 per_batch = '--'
+                batches_per_epoch = '--'
+                estimated_time = '--'
 
-            batches_per_epoch = 9_000_000 / hypers.batch_size
-            estimated_time = per_batch * ((batches_per_epoch - batch_num) + batches_per_epoch*(hypers.epochs - epoch - 1))
 
             log(f'Batch: {batch_num}\tloss: {loss_val}\tbatch time: {time_since_report}\tmean batch time: {per_batch}\testimated time remaining: {estimated_time}')
 
