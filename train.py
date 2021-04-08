@@ -77,7 +77,7 @@ report_times = np.array([], dtype='float32')
 for epoch in range(hypers.epochs):
     # Get training batches
     key, key_ = random.split(key)
-    training_batches = get_batches(hypers, key_, 'validation')
+    training_batches = get_batches(hypers, key_, 'train')
     
     for batch_num, (source_batch, target_batch) in enumerate(training_batches):
         key, key_ = random.split(key)
