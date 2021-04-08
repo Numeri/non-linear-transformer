@@ -3,11 +3,12 @@ import jax
 
 from flax import linen as nn
 from jax import numpy as np, random
+import sentencepiece as spm
 
 import time
 
 from model import Transformer
-from decode import max_decode_logits
+from decode import max_decode_logits, beam_search, max_decode
 from dataloader import get_batches
 from hyperparameters import Hyperparameters, hypers
 
@@ -50,6 +51,21 @@ def train_step(key, optimizer, source_batch, target_batch):
 
     return optimizer, loss_val
 
+def eval_step(optimizer, source_batch, target_batch, batch_num):
+    sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
+    model.hypers.deterministic = True
+    with open(f'eval/{batch_num}.txt', 'w') as outfile:
+        for i in range(source_batch.shape[0]):
+            print(i)
+            decoded_seq, _ = max_decode_logits(hypers, key, model, optimizer.target, source_batch[i])
+            outfile.write(sp.decode(source_batch[i].tolist()))
+            outfile.write('\n')
+            outfile.write(sp.decode(target_batch[i].tolist()))
+            outfile.write('\n')
+            outfile.write(decoded_seq)
+            outfile.write('\n\n')
+    model.hypers.deterministic = False
+
 # Set up optimizer
 optimizer = flax.optim.Adam(hypers.learning_rate).create(params)
 
@@ -72,6 +88,10 @@ for epoch in range(hypers.epochs):
             serial_params = flax.serialization.to_bytes(optimizer.target)
             with open(f'{hypers.model_folder}/{hypers.model_name}_{batch_num}.params', 'wb') as outfile:
                 outfile.write(serial_params)
+            
+            validation_batches = get_batches(hypers, random.PRNGKey(1), 'validation')
+            val_src_batch, val_trg_batch = next(validation_batches)
+            eval_step(optimizer, val_src_batch, val_trg_batch, batch_num)
 
         if batch_num % hypers.log_every == 0:
             time_since_report = time.perf_counter() - last_time

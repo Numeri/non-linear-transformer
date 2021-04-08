@@ -10,11 +10,13 @@ from hyperparameters import Hyperparameters
 
 JaxArray = jax.interpreters.xla._DeviceArray
 
-def max_decode(hypers : Hyperparameters, model : Transformer, params : Any,  source : Union[str, bytes]):
+def max_decode(hypers : Hyperparameters, model : Transformer, params : Any,  source : Union[JaxArray, str]):
     sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
     eos_id = sp.piece_to_id('</s>')
 
-    source = np.array(dataloader.process_sentence(hypers, sp, source))
+    if type(source) is str:
+        source = np.array(dataloader.process_sentence(hypers, sp, source))
+
     source = np.expand_dims(source, 0)
 
     decoded_seq = np.zeros((1, hypers.seq_length), dtype='int32')
@@ -54,9 +56,11 @@ def max_decode_logits(hypers : Hyperparameters, key : np.ndarray, model : Transf
 
     decoded_seq, all_logits = jax.lax.scan(update, decoded_seq, np.arange(hypers.seq_length))
 
-    return all_logits
+    decoded_seq = sp.decode(decoded_seq[0].tolist())
 
-def beam_search(hypers : Hyperparameters, model : Transformer, params : Any,  source : Union[str, bytes]):
+    return decoded_seq, all_logits
+
+def beam_search(hypers : Hyperparameters, model : Transformer, params : Any,  source : Union[JaxArray, str]):
     sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
     eos_id = sp.piece_to_id('</s>')
 
@@ -91,7 +95,9 @@ def beam_search(hypers : Hyperparameters, model : Transformer, params : Any,  so
     def is_finished(decoded_seq : JaxArray) -> bool:
         return np.isin(decoded_seq, eos_id).any()
 
-    source = np.array(dataloader.process_sentence(hypers, sp, source))
+    if type(source) is str:
+        source = np.array(dataloader.process_sentence(hypers, sp, source))
+
     source = np.expand_dims(source, 0)
 
     top_seqs       = np.zeros((1, hypers.seq_length), dtype='int32')
