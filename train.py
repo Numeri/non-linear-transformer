@@ -37,18 +37,13 @@ last_time = time.perf_counter()
 @jax.jit
 def train_step(key, optimizer, source_batch, target_batch):
     def loss(params):
-        def cross_entropy_sentence(source, target):
-            """Cross entropy loss for a single source-target sentence pair"""
-            logits = max_decode_logits(hypers, key, model, params, source)
-            target_logits = jax.nn.one_hot(target, hypers.vocabulary_size, dtype='float32')
-            weights = np.where(logits.sum(axis=-1) > 0, 1, 0)
+        logits = model.apply(params, source_batch, target_batch, rngs={'dropout': key})
+        target_logits = jax.nn.one_hot(target_batch, hypers.vocabulary_size, dtype='float32')
+        #weights = np.where(logits.sum(axis=-1) > 0, 1, 0)
 
-            cross_entropies = -weights*np.sum(target_logits * np.log(logits), axis=-1)
+        cross_entropies = -np.sum(target_logits * np.log(logits), axis=-1)
 
-            return np.mean(cross_entropies, axis=-1)
-
-        sentence_losses = jax.vmap(cross_entropy_sentence)(source_batch, target_batch)
-        return np.mean(sentence_losses)
+        return np.mean(cross_entropies)
 
     loss_val, grad = jax.value_and_grad(loss)(optimizer.target)
     optimizer = optimizer.apply_gradient(grad)
