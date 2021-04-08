@@ -11,8 +11,6 @@ from decode import max_decode_logits
 from dataloader import get_batches
 from hyperparameters import Hyperparameters, hypers
 
-jax.profiler.start_trace('/tmp/tensorboard')
-
 def log(s : str):
     with open(hypers.log_file, 'a') as outfile:
         outfile.write(s)
@@ -36,7 +34,8 @@ params = model.init({'dropout': rng, 'params': key_}, dummy, dummy)
 log(f'Parameters initialized ({time.perf_counter() - last_time:7.3f} seconds)')
 last_time = time.perf_counter()
 
-def make_batched_loss(key, source_batch, target_batch):
+@jax.jit
+def train_step(key, optimizer, source_batch, target_batch):
     def loss(params):
         def cross_entropy_sentence(source, target):
             """Cross entropy loss for a single source-target sentence pair"""
@@ -50,7 +49,11 @@ def make_batched_loss(key, source_batch, target_batch):
 
         sentence_losses = jax.vmap(cross_entropy_sentence)(source_batch, target_batch)
         return np.mean(sentence_losses)
-    return jax.jit(loss)
+
+    loss_val, grad = jax.value_and_grad(loss)(optimizer.target)
+    optimizer = optimizer.apply_gradient(grad)
+
+    return optimizer, loss_val
 
 # Set up optimizer
 optimizer = flax.optim.Adam(hypers.learning_rate).create(params)
@@ -68,11 +71,7 @@ for epoch in range(hypers.epochs):
     
     for batch_num, (source_batch, target_batch) in enumerate(training_batches):
         key, key_ = random.split(key)
-        loss = make_batched_loss(key_, source_batch, target_batch)
-        loss_val_grad = jax.value_and_grad(loss)
-
-        loss_val, grad = loss_val_grad(optimizer.target)
-        optimizer = optimizer.apply_gradient(grad)
+        optimizer, loss_val = train_step(key_, optimizer, source_batch, target_batch)
 
         if batch_num % hypers.checkpoint_every == 0:
             serial_params = flax.serialization.to_bytes(optimizer.target)
@@ -81,12 +80,18 @@ for epoch in range(hypers.epochs):
 
         if batch_num % hypers.log_every == 0:
             time_since_report = time.perf_counter() - last_time
+
             report_times = np.append(report_times, time_since_report)
-            per_batch = report_times.mean() / hypers.log_every
+
+            if len(report_times) > 1:
+                per_batch = report_times[1:].mean() / hypers.log_every
+            else:
+                per_batch = '--'
+
             batches_per_epoch = 9_000_000 / hypers.batch_size
             estimated_time = per_batch * ((batches_per_epoch - batch_num) + batches_per_epoch*(hypers.epochs - epoch - 1))
-            log(f'Batch: {batch_num}\tloss: {loss_val}\tmean batch time: {per_batch}\testimated time remaining: {estimated_time}')
+
+            log(f'Batch: {batch_num}\tloss: {loss_val}\tbatch time: {time_since_report}\tmean batch time: {per_batch}\testimated time remaining: {estimated_time}')
+
             last_time = time.perf_counter()
-            
-            jax.profiler.stop_trace()
 
