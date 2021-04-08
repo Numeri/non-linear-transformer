@@ -11,6 +11,7 @@ from decode import max_decode_logits
 from dataloader import get_batches
 from hyperparameters import Hyperparameters, hypers
 
+jax.profiler.start_trace('/tmp/tensorboard')
 
 def log(s : str):
     with open(hypers.log_file, 'a') as outfile:
@@ -35,11 +36,11 @@ params = model.init({'dropout': rng, 'params': key_}, dummy, dummy)
 log(f'Parameters initialized ({time.perf_counter() - last_time:7.3f} seconds)')
 last_time = time.perf_counter()
 
-def make_batched_loss(source_batch, target_batch):
+def make_batched_loss(key, source_batch, target_batch):
     def loss(params):
         def cross_entropy_sentence(source, target):
             """Cross entropy loss for a single source-target sentence pair"""
-            logits = max_decode_logits(hypers, model, params, source)
+            logits = max_decode_logits(hypers, key, model, params, source)
             target_logits = jax.nn.one_hot(target, hypers.vocabulary_size, dtype='float32')
             weights = np.where(logits.sum(axis=-1) > 0, 1, 0)
 
@@ -66,7 +67,8 @@ for epoch in range(hypers.epochs):
     training_batches = get_batches(hypers, key_, 'train')
     
     for batch_num, (source_batch, target_batch) in enumerate(training_batches):
-        loss = make_batched_loss(source_batch, target_batch)
+        key, key_ = random.split(key)
+        loss = make_batched_loss(key_, source_batch, target_batch)
         loss_val_grad = jax.value_and_grad(loss)
 
         loss_val, grad = loss_val_grad(optimizer.target)
@@ -85,4 +87,6 @@ for epoch in range(hypers.epochs):
             estimated_time = per_batch * ((batches_per_epoch - batch_num) + batches_per_epoch*(hypers.epochs - epoch - 1))
             log(f'Batch: {batch_num}\tloss: {loss_val}\tmean batch time: {per_batch}\testimated time remaining: {estimated_time}')
             last_time = time.perf_counter()
+            
+            jax.profiler.stop_trace()
 

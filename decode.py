@@ -34,7 +34,7 @@ def max_decode(hypers : Hyperparameters, model : Transformer, params : Any,  sou
 
     return decoded_str, log_score
 
-def max_decode_logits(hypers : Hyperparameters, model : Transformer, params : Any,  source : Union[JaxArray, str]):
+def max_decode_logits(hypers : Hyperparameters, key : np.ndarray, model : Transformer, params : Any,  source : Union[JaxArray, str]):
     sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
     eos_id = sp.piece_to_id('</s>')
 
@@ -47,10 +47,8 @@ def max_decode_logits(hypers : Hyperparameters, model : Transformer, params : An
     all_logits = np.zeros((hypers.seq_length, hypers.vocabulary_size))
     position = 0
 
-    model.hypers.deterministic = True
-
     while position < hypers.seq_length:
-        logits = model.apply(params, source, decoded_seq)
+        logits = model.apply(params, source, decoded_seq, rngs={'dropout': key})
         all_logits = jax.ops.index_update(all_logits, position, logits[0, position])
 
         max_next_word = np.argmax(logits[0, position])

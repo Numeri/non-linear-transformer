@@ -16,9 +16,7 @@ def interlaced(hypers : Hyperparameters, key : np.ndarray, dataset_name : str, m
 
     line_count = len(linecache.cache[source_filename][2])
 
-    cpus = jax.devices('cpu')
-
-    indices = jax.device_put(np.arange(line_count), cpus[0])
+    indices = np.arange(line_count)
     indices = random.permutation(key, indices)
 
     for i in indices[:max_length // 2]:
@@ -37,9 +35,7 @@ def get_batches(hypers : Hyperparameters, key : np.ndarray, dataset_name : str):
 
     line_count = len(linecache.cache[source_filename][2])
 
-    cpus = jax.devices('cpu')
-
-    indices = jax.device_put(np.arange(line_count), cpus[0])
+    indices = np.arange(line_count)
     indices = random.permutation(key, indices)
 
     for batch_start in range(0, line_count, hypers.batch_size):
