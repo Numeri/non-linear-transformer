@@ -44,16 +44,15 @@ def max_decode_logits(hypers : Hyperparameters, key : np.ndarray, model : Transf
     source = np.expand_dims(source, 0)
 
     decoded_seq = np.zeros((1, hypers.seq_length), dtype='int32')
-    all_logits = np.zeros((hypers.seq_length, hypers.vocabulary_size))
-    position = 0
 
-    while position < hypers.seq_length:
+    def update(decoded_seq, position):
         logits = model.apply(params, source, decoded_seq, rngs={'dropout': key})
-        all_logits = jax.ops.index_update(all_logits, position, logits[0, position])
-
         max_next_word = np.argmax(logits[0, position])
         decoded_seq = jax.ops.index_update(decoded_seq, position, max_next_word)
-        position += 1
+
+        return decoded_seq, logits[0, position]
+
+    decoded_seq, all_logits = jax.lax.scan(update, decoded_seq, np.arange(hypers.seq_length))
 
     return all_logits
 
