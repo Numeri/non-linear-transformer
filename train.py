@@ -40,9 +40,9 @@ def train_step(key, optimizer, source_batch, target_batch):
     def loss(params):
         logits = model.apply(params, source_batch, target_batch, rngs={'dropout': key})
         target_logits = jax.nn.one_hot(target_batch, hypers.vocabulary_size, dtype='float32')
-        #weights = np.where(logits.sum(axis=-1) > 0, 1, 0)
+        weights = np.where(target_batch > 0, 1, 0)
 
-        cross_entropies = -np.sum(target_logits * np.log(logits), axis=-1)
+        cross_entropies = -weights*np.sum(target_logits * np.log(logits), axis=-1)
 
         return np.mean(cross_entropies)
 
@@ -56,7 +56,6 @@ def eval_step(optimizer, source_batch, target_batch, batch_num):
     model.hypers.deterministic = True
     with open(f'eval/{batch_num}.txt', 'w') as outfile:
         for i in range(source_batch.shape[0]):
-            print(i)
             decoded_seq, _ = max_decode_logits(hypers, key, model, optimizer.target, source_batch[i])
             outfile.write(sp.decode(source_batch[i].tolist()))
             outfile.write('\n')
