@@ -65,7 +65,6 @@ def beam_search(hypers : Hyperparameters, model : Transformer, params : Any,  so
     eos_id = sp.piece_to_id('</s>')
 
     def top_next(n : int, position : int, source : JaxArray, decoded_seqs : JaxArray, log_scores : JaxArray):
-        breakpoint()
         logits = model.apply(params, source, decoded_seqs)
         top_words = np.argsort(-logits[:, position])[:, :n]
         top_log_scores = np.log(np.take_along_axis(logits[:, position, :], top_words[:, :n], axis=-1))
