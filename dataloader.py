@@ -24,7 +24,7 @@ def interlaced(hypers : Hyperparameters, key : np.ndarray, dataset_name : str, m
         yield linecache.getline(target_filename, i)
 
 
-def get_batches(hypers : Hyperparameters, key : np.ndarray, dataset_name : str):
+def get_batches(hypers : Hyperparameters, key : np.ndarray, dataset_name : str, start_batch : int = 0):
     sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
 
     source_filename = f'{hypers.dataset_prefix}/{dataset_name}.{hypers.language_pair[0]}'
@@ -38,7 +38,7 @@ def get_batches(hypers : Hyperparameters, key : np.ndarray, dataset_name : str):
     indices = np.arange(line_count)
     indices = random.permutation(key, indices)
 
-    for batch_start in range(0, line_count, hypers.batch_size):
+    for batch_start in range(start_batch, line_count, hypers.batch_size):
         batch_end = batch_start + hypers.batch_size
         batch_end = np.minimum(batch_end, line_count)
 
