@@ -16,6 +16,7 @@ def log(s : str):
     with open(hypers.log_file, 'a') as outfile:
         outfile.write(s)
         outfile.write('\n')
+    print(s)
 
 key = random.PRNGKey(11)
 
