@@ -121,3 +121,5 @@ for epoch in range(hypers.epochs):
 
             last_time = time.perf_counter()
 
+    start_batch = 0
+
