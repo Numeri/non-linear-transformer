@@ -51,8 +51,8 @@ def train_step(key, optimizer, source_batch, target_batch):
 
     return optimizer, loss_val
 
+sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
 def eval_step(optimizer, source_batch, target_batch, batch_num):
-    sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
     model.hypers.deterministic = True
     with open(f'eval/{batch_num}.txt', 'w') as outfile:
         for i in range(source_batch.shape[0]):
@@ -67,6 +67,13 @@ def eval_step(optimizer, source_batch, target_batch, batch_num):
 
 # Set up optimizer
 optimizer = flax.optim.Adam(hypers.learning_rate).create(params)
+start_batch = 0
+
+if hypers.restore_checkpoint is not None:
+    with open(f'{hypers.model_folder}/{hypers.model_name}_{hypers.restore_checkpoint}.params', 'rb') as infile:
+        target = flax.serialization.from_bytes(optimizer.target, infile.read())
+        optimizer = flax.optim.Adam(hypers.learning_rate).create(params)
+    start_batch = hypers.restore_checkpoint
 
 log(f'Starting training ({time.perf_counter() - last_time:7.3f} seconds)')
 last_time = time.perf_counter()
@@ -77,16 +84,19 @@ report_times = np.array([], dtype='float32')
 for epoch in range(hypers.epochs):
     # Get training batches
     key, key_ = random.split(key)
-    training_batches = get_batches(hypers, key_, 'train')
+    training_batches = get_batches(hypers, key_, 'train', start_batch)
     
     for batch_num, (source_batch, target_batch) in enumerate(training_batches):
+        # batch_num is 0..n, but we might start partway through after restoring a checkpoint
+        batch_num += start_batch
+
         key, key_ = random.split(key)
         optimizer, loss_val = train_step(key_, optimizer, source_batch, target_batch)
 
         if batch_num % hypers.checkpoint_every == 0:
-            serial_params = flax.serialization.to_bytes(optimizer.target)
+            bytes_optimizer = flax.serialization.to_bytes(optimizer)
             with open(f'{hypers.model_folder}/{hypers.model_name}_{batch_num}.params', 'wb') as outfile:
-                outfile.write(serial_params)
+                outfile.write(bytes_optimizer)
             
             validation_batches = get_batches(hypers, random.PRNGKey(1), 'validation')
             val_src_batch, val_trg_batch = next(validation_batches)

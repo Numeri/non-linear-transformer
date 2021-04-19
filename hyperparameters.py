@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
 @dataclass
@@ -28,6 +28,7 @@ class Hyperparameters:
     dataset_prefix : str
     model_folder : str
     model_name : str
+    restore_checkpoint : Optional[int]
     log_file : str
     vocabulary_prefix : str
     max_vocab_sentences : int
@@ -54,6 +55,7 @@ hypers = Hyperparameters(batch_size            = 10,
                          dataset_prefix        = 'corpora/wmt14_translate/de-en',
                          model_folder          = 'models',
                          model_name            = 'vanilla_transformer',
+                         restore_checkpoint    = None,
                          log_file              = 'log.txt',
                          vocabulary_prefix     = 'sentencepiece',
                          max_vocab_sentences   = 1_000_000,
