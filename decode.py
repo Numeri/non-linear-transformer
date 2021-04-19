@@ -29,7 +29,7 @@ def max_decode(hypers : Hyperparameters, model : Transformer, params : Any,  sou
         logits = model.apply(params, source, decoded_seq)
         max_next_word = np.argmax(logits[0, position])
         log_score = log_score + np.log(logits[:, position, max_next_word])
-        decoded_seq = jax.ops.index_update(decoded_seq, position, max_next_word)
+        decoded_seq = jax.ops.index_update(decoded_seq, (0,position), max_next_word)
         position += 1
 
     decoded_str = sp.decode(decoded_seq[0].tolist())
@@ -50,7 +50,7 @@ def max_decode_logits(hypers : Hyperparameters, key : np.ndarray, model : Transf
     def update(decoded_seq, position):
         logits = model.apply(params, source, decoded_seq, rngs={'dropout': key})
         max_next_word = np.argmax(logits[0, position])
-        decoded_seq = jax.ops.index_update(decoded_seq, position, max_next_word)
+        decoded_seq = jax.ops.index_update(decoded_seq, (0,position), max_next_word)
 
         return decoded_seq, logits[0, position]
 
@@ -65,6 +65,7 @@ def beam_search(hypers : Hyperparameters, model : Transformer, params : Any,  so
     eos_id = sp.piece_to_id('</s>')
 
     def top_next(n : int, position : int, source : JaxArray, decoded_seqs : JaxArray, log_scores : JaxArray):
+        breakpoint()
         logits = model.apply(params, source, decoded_seqs)
         top_words = np.argsort(-logits[:, position])[:, :n]
         top_log_scores = np.log(np.take_along_axis(logits[:, position, :], top_words[:, :n], axis=-1))
