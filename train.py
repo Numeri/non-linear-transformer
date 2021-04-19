@@ -109,16 +109,16 @@ for epoch in range(hypers.epochs):
             report_times = np.append(report_times, time_since_report)
 
             if len(report_times) > 1:
-                per_batch = report_times[1:].mean() / hypers.log_every
-                batches_per_epoch = 9_000_000 / hypers.batch_size
-                estimated_time = per_batch * ((batches_per_epoch - batch_num) + batches_per_epoch*(hypers.epochs - epoch - 1))
+                per_sentence = report_times[1:].mean() / (hypers.log_every * hypers.batch_size)
+                sentences_per_epoch = 9_000_000
+                remaining_sentences = sentences_per_epoch - batch_num * hypers.batch_size + sentences_per_epoch * (hypers.epochs - epoch - 1)
+                estimated_time = per_sentence * remaining_sentences
             else:
-                per_batch = '--'
-                batches_per_epoch = '--'
+                per_sentence = '--'
                 estimated_time = '--'
 
 
-            log(f'Batch: {batch_num}\tloss: {loss_val}\tbatch time: {time_since_report}\tmean batch time: {per_batch}\testimated time remaining: {estimated_time}')
+            log(f'Batch: {batch_num}\tloss: {loss_val}\tbatch time: {time_since_report}\tmean sentence time: {per_sentence}\testimated time remaining: {estimated_time}')
 
             last_time = time.perf_counter()
 
