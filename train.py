@@ -73,6 +73,7 @@ start_batch = 0
 if hypers.restore_checkpoint is not None:
     with open(f'{hypers.model_folder}/{hypers.model_name}_{hypers.restore_checkpoint}.params', 'rb') as infile:
         optimizer = flax.serialization.from_bytes(optimizer, infile.read())
+        optimizer = jax.tree_map(np.asarray, optimizer)
     start_batch = hypers.restore_checkpoint
 
 log(f'Starting training ({time.perf_counter() - last_time:7.3f} seconds)')
