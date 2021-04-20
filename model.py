@@ -108,11 +108,8 @@ class Decoder(nn.Module):
     @nn.compact
     def __call__(self,
             x : JaxArray,
-            decoded_seq : JaxArray,
+            decoder_mask : JaxArray,
             encoder_output : JaxArray) -> JaxArray:
-
-        # Make a standard decoder mask
-        decoder_mask = nn.attention.make_causal_mask(decoded_seq)
 
         # Compute the decoder multi-headed self-attention
         multihead_residual = x
@@ -183,10 +180,13 @@ class Transformer(nn.Module):
         # Use the shared embedding
         x = TransformerEmbedding(self.hypers, shared_embedding)(x)
 
+        # Make a standard decoder mask
+        decoder_mask = nn.attention.make_causal_mask(decoded_seq)
+
         # Pass the output of the encoder and the previous decoder
         # output through the stack of decoders
         for _ in range(self.hypers.num_decoders):
-            x = Decoder(self.hypers)(x, decoded_seq, encoder_output)
+            x = Decoder(self.hypers)(x, decoder_mask, encoder_output)
 
         # Use the transform of the shared embedding to decode the output
         x = shared_embedding.attend(x)
