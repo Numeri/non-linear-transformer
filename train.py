@@ -72,7 +72,7 @@ last_time = time.perf_counter()
 
 # Set up optimizer
 optimizer = flax.optim.Adam(
-        hypers.learning_rate,
+        learning_rate=1,
         beta1=hypers.adam_beta_1,
         beta2=hypers.adam_beta_2,
         eps=hypers.adam_epsilon
