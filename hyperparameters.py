@@ -5,7 +5,10 @@ from dataclasses import dataclass
 class Hyperparameters:
     # Training parameters
     batch_size : int
-    learning_rate : float
+    warmup_steps : float
+    adam_beta_1 : float
+    adam_beta_2 : float
+    adam_epsilon : float
     epochs : int
     checkpoint_every : int
     log_every : int
@@ -34,7 +37,10 @@ class Hyperparameters:
     max_vocab_sentences : int
 
 hypers = Hyperparameters(batch_size            = 10,
-                         learning_rate         = 0.01,
+                         warmup_steps          = 3000,
+                         adam_beta_1           = 0.9,
+                         adam_beta_2           = 0.98,
+                         adam_epsilon          = 10e-9,
                          epochs                = 1,
                          checkpoint_every      = 1000,
                          log_every             = 10,

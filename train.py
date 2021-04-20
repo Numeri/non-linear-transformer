@@ -18,6 +18,40 @@ def log(s : str):
         outfile.write('\n')
     print(s)
 
+def learning_rate_fn(step_num):
+    return (hypers.d_model**-0.5) * np.minimum(step_num**-0.5, step_num*hypers.warmup_steps**-1.5)
+
+@jax.jit
+def train_step(key, optimizer, source_batch, target_batch, step_num):
+    def loss(params):
+        logits = model.apply(params, source_batch, target_batch, rngs={'dropout': key})
+        target_logits = jax.nn.one_hot(target_batch, hypers.vocabulary_size, dtype='float32')
+        weights = np.where(target_batch > 0, 1, 0)
+
+        cross_entropies = -weights*np.sum(target_logits * np.log(logits), axis=-1)
+
+        return np.mean(cross_entropies)
+
+    loss_val, grad = jax.value_and_grad(loss)(optimizer.target)
+    lr = learning_rate_fn(step_num)
+    optimizer = optimizer.apply_gradient(grad, {'learning_rate': lr})
+
+    return optimizer, loss_val
+
+sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
+def eval_step(optimizer, source_batch, target_batch, batch_num):
+    model.hypers.deterministic = True
+    with open(f'eval/{batch_num}.txt', 'w') as outfile:
+        for i in range(source_batch.shape[0]):
+            decoded_seq, _ = max_decode_logits(hypers, key, model, optimizer.target, source_batch[i])
+            outfile.write(sp.decode(source_batch[i].tolist()))
+            outfile.write('\n')
+            outfile.write(sp.decode(target_batch[i].tolist()))
+            outfile.write('\n')
+            outfile.write(decoded_seq)
+            outfile.write('\n\n')
+    model.hypers.deterministic = False
+
 key = random.PRNGKey(11)
 
 last_time = time.perf_counter()
@@ -36,38 +70,13 @@ params = model.init({'dropout': rng, 'params': key_}, dummy, dummy)
 log(f'Parameters initialized ({time.perf_counter() - last_time:7.3f} seconds)')
 last_time = time.perf_counter()
 
-@jax.jit
-def train_step(key, optimizer, source_batch, target_batch):
-    def loss(params):
-        logits = model.apply(params, source_batch, target_batch, rngs={'dropout': key})
-        target_logits = jax.nn.one_hot(target_batch, hypers.vocabulary_size, dtype='float32')
-        weights = np.where(target_batch > 0, 1, 0)
-
-        cross_entropies = -weights*np.sum(target_logits * np.log(logits), axis=-1)
-
-        return np.mean(cross_entropies)
-
-    loss_val, grad = jax.value_and_grad(loss)(optimizer.target)
-    optimizer = optimizer.apply_gradient(grad)
-
-    return optimizer, loss_val
-
-sp = spm.SentencePieceProcessor(model_file=f'{hypers.model_folder}/{hypers.vocabulary_prefix}.model')
-def eval_step(optimizer, source_batch, target_batch, batch_num):
-    model.hypers.deterministic = True
-    with open(f'eval/{batch_num}.txt', 'w') as outfile:
-        for i in range(source_batch.shape[0]):
-            decoded_seq, _ = max_decode_logits(hypers, key, model, optimizer.target, source_batch[i])
-            outfile.write(sp.decode(source_batch[i].tolist()))
-            outfile.write('\n')
-            outfile.write(sp.decode(target_batch[i].tolist()))
-            outfile.write('\n')
-            outfile.write(decoded_seq)
-            outfile.write('\n\n')
-    model.hypers.deterministic = False
-
 # Set up optimizer
-optimizer = flax.optim.Adam(hypers.learning_rate).create(params)
+optimizer = flax.optim.Adam(
+        hypers.learning_rate,
+        beta1=hypers.adam_beta_1,
+        beta2=hypers.adam_beta_2,
+        eps=hypers.adam_epsilon
+        ).create(params)
 start_batch = 0
 
 if hypers.restore_checkpoint is not None:
@@ -81,6 +90,8 @@ last_time = time.perf_counter()
 
 report_times = np.array([], dtype='float32')
 
+step_num = start_batch
+
 # Training loop
 for epoch in range(hypers.epochs):
     # Get training batches
@@ -90,9 +101,16 @@ for epoch in range(hypers.epochs):
     for batch_num, (source_batch, target_batch) in enumerate(training_batches):
         # batch_num is 0..n, but we might start partway through after restoring a checkpoint
         batch_num += start_batch
+        step_num += 1
 
         key, key_ = random.split(key)
-        optimizer, loss_val = train_step(key_, optimizer, source_batch, target_batch)
+        optimizer, loss_val = train_step(
+                key_,
+                optimizer,
+                source_batch,
+                target_batch,
+                step_num, 
+                )
 
         if batch_num % hypers.checkpoint_every == 0:
             bytes_optimizer = flax.serialization.to_bytes(optimizer)
