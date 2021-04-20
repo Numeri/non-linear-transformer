@@ -99,9 +99,12 @@ for epoch in range(hypers.epochs):
             with open(f'{hypers.model_folder}/{hypers.model_name}_{batch_num}.params', 'wb') as outfile:
                 outfile.write(bytes_optimizer)
             
+            batch_size = hypers.batch_size
+            hypers.batch_size = 10
             validation_batches = get_batches(hypers, random.PRNGKey(1), 'validation')
             val_src_batch, val_trg_batch = next(validation_batches)
             eval_step(optimizer, val_src_batch, val_trg_batch, batch_num)
+            hypers.batch_size = batch_size
 
         if batch_num % hypers.log_every == 0:
             time_since_report = time.perf_counter() - last_time
