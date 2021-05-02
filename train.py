@@ -34,7 +34,7 @@ def train_step(key, optimizer, source_batch, target_batch, step_num):
 
     loss_val, grad = jax.value_and_grad(loss)(optimizer.target)
     lr = learning_rate_fn(step_num)
-    optimizer = optimizer.apply_gradient(grad, {'learning_rate': lr})
+    optimizer = optimizer.apply_gradient(grad, learning_rate=lr)
 
     return optimizer, loss_val
 
