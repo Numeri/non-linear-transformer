@@ -3,3 +3,5 @@ __pycache__/
 .~*
 eval/*
 *.txt
+models/*
+tb.trace/
