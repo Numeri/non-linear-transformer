@@ -156,7 +156,8 @@ class Transformer(nn.Module):
         # Create an embedding to be shared between the input/output encoding,
         # and the decoding blocks
         shared_embedding = nn.Embed(num_embeddings=self.hypers.vocabulary_size,
-                                    features=self.hypers.d_model)
+                                    features=self.hypers.d_model,
+                                    embedding_init=nn.initializers.normal(stddev=1.0))
 
         # Embed the input (includes positional embedding)
         x = TransformerEmbedding(self.hypers, shared_embedding)(x)
@@ -164,7 +165,6 @@ class Transformer(nn.Module):
         # Pass the embedded input through the stack of encoders
         for _ in range(self.hypers.num_encoders):
             x = Encoder(self.hypers)(x)
-
 
         # Save the output of the encoder
         encoder_output = x
