@@ -68,6 +68,7 @@ class FeedForward(nn.Module):
     @nn.compact
     def __call__(self, x : JaxArray) -> JaxArray:
         x = nn.Dense(features=self.hypers.d_model)(x)
+        x = nn.relu(x)
         x = nn.Dense(features=self.hypers.d_model)(x)
 
         return x
