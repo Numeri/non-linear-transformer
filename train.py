@@ -29,8 +29,9 @@ def train_step(key, optimizer, source_batch, target_batch, step_num):
         weights = np.where(target_batch > 0, 1, 0)
 
         cross_entropies = -weights*np.sum(target_logits * np.log(logits), axis=-1)
+        losses = np.sum(cross_entropies, axis=-1)
 
-        return np.mean(cross_entropies)
+        return np.mean(losses)
 
     loss_val, grad = jax.value_and_grad(loss)(optimizer.target)
     lr = learning_rate_fn(step_num)
