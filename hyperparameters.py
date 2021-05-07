@@ -36,15 +36,15 @@ class Hyperparameters:
     vocabulary_prefix : str
     max_vocab_sentences : int
 
-hypers = Hyperparameters(batch_size            = 10,
+hypers = Hyperparameters(batch_size            = 100,
                          warmup_steps          = 3000,
                          adam_beta_1           = 0.9,
                          adam_beta_2           = 0.98,
                          adam_epsilon          = 10e-9,
                          epochs                = 1,
-                         checkpoint_every      = 1000,
-                         log_every             = 10,
-                         deterministic         = False,
+                         checkpoint_every      = 500,
+                         log_every             = 20,
+                         deterministic         = True,
                          training_attn_dropout = 0.05,
 
                          d_model               = 512 // 2,
