@@ -67,9 +67,13 @@ class FeedForward(nn.Module):
 
     @nn.compact
     def __call__(self, x : JaxArray) -> JaxArray:
-        x = nn.Dense(features=self.hypers.d_model)(x)
+        x = nn.Dense(features=self.hypers.d_model,
+                     kernel_init=nn.initializers.xavier_uniform(),
+                     bias_init=nn.initializers.normal(stddev=1e-6))(x)
         x = nn.relu(x)
-        x = nn.Dense(features=self.hypers.d_model)(x)
+        x = nn.Dense(features=self.hypers.d_model,
+                     kernel_init=nn.initializers.xavier_uniform(),
+                     bias_init=nn.initializers.normal(stddev=1e-6))(x)
 
         return x
 
@@ -87,7 +91,9 @@ class Encoder(nn.Module):
         x = nn.attention.MultiHeadDotProductAttention(
                 num_heads=self.hypers.num_heads,
                 dropout_rate=self.hypers.training_attn_dropout,
-                deterministic=self.hypers.deterministic)(x, x)
+                deterministic=self.hypers.deterministic,
+                kernel_init=nn.initializers.xavier_uniform(),
+                bias_init=nn.initializers.normal(stddev=1e-6))(x, x)
         x = x + multihead_residual
         x = nn.LayerNorm()(x)
 
@@ -117,7 +123,9 @@ class Decoder(nn.Module):
         x = nn.attention.MultiHeadDotProductAttention(
                 num_heads=self.hypers.num_heads,
                 dropout_rate=self.hypers.training_attn_dropout,
-                deterministic=self.hypers.deterministic)(x, x, decoder_mask)
+                deterministic=self.hypers.deterministic,
+                kernel_init=nn.initializers.xavier_uniform(),
+                bias_init=nn.initializers.normal(stddev=1e-6))(x, x, decoder_mask)
         x = x + multihead_residual
         x = nn.LayerNorm()(x)
 
@@ -128,7 +136,9 @@ class Decoder(nn.Module):
         x = nn.attention.MultiHeadDotProductAttention(
                 num_heads=self.hypers.num_heads,
                 dropout_rate=self.hypers.training_attn_dropout,
-                deterministic=self.hypers.deterministic)(x, encoder_output)
+                deterministic=self.hypers.deterministic,
+                kernel_init=nn.initializers.xavier_uniform(),
+                bias_init=nn.initializers.normal(stddev=1e-6))(x, encoder_output)
         x = x + encoder_decoder_residual
         x = nn.LayerNorm()(x)
 
