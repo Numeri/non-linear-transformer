@@ -10,6 +10,44 @@ from hyperparameters import Hyperparameters
 
 JaxArray = jax.interpreters.xla._DeviceArray
 
+class FullLayerNorm(nn.Module):
+    """Full layer normalization. 
+
+    This normalizes input along all axes except the batch axis (first).
+    """
+    epsilon: float = 1e-6
+    dtype = np.float32
+    use_bias: bool = True
+    use_scale: bool = True
+
+    @nn.compact
+    def __call__(self, x):
+        """Applies full layer normalization on the input.
+
+        Args:
+        x: the inputs
+
+        Returns:
+        Normalized inputs (the same shape as inputs).
+        """
+        x = np.asarray(x, np.float32)
+        features = x.shape[1:]
+        axes = tuple(np.arange(len(x.shape) - 1) + 1)
+        mean = np.mean(x, axis=axes, keepdims=True)
+        mean2 = np.mean(x*x, axis=axes, keepdims=True)
+        var = mean2 - mean*mean
+        mul = jax.lax.rsqrt(var + self.epsilon)
+        if self.use_scale:
+            mul = mul * np.asarray(
+                    self.param('scale', jax.nn.initializers.ones, features),
+                    self.dtype)
+        y = (x - mean) * mul
+        if self.use_bias:
+            y = y + np.asarray(
+                    self.param('bias', jax.nn.initializers.zeros, features),
+                    self.dtype)
+        return np.asarray(y, self.dtype)
+
 class PositionalEmbedding(nn.Module):
     """Create sinusoidal positional encodings for each position in the input
 
@@ -52,6 +90,7 @@ class TransformerEmbedding(nn.Module):
 
     @nn.compact
     def __call__(self, x : JaxArray) -> JaxArray:
+        breakpoint()
         x = self.shared_embedding(x)
         x = PositionalEmbedding(hypers=self.hypers)(x)
 
@@ -95,12 +134,12 @@ class Encoder(nn.Module):
                 kernel_init=nn.initializers.xavier_uniform(),
                 bias_init=nn.initializers.normal(stddev=1e-6))(x, x)
         x = x + multihead_residual
-        x = nn.LayerNorm()(x)
+        x = nn.FullLayerNorm()(x)
 
         feed_forward_residual = x
         x = FeedForward(self.hypers)(x)
         x = x + feed_forward_residual
-        x = nn.LayerNorm()(x)
+        x = nn.FullLayerNorm()(x)
 
         return x
 
@@ -127,7 +166,7 @@ class Decoder(nn.Module):
                 kernel_init=nn.initializers.xavier_uniform(),
                 bias_init=nn.initializers.normal(stddev=1e-6))(x, x, decoder_mask)
         x = x + multihead_residual
-        x = nn.LayerNorm()(x)
+        x = nn.FullLayerNorm()(x)
 
         # Compute the encoder-decoder attention
         # Encoder provides the values and the keys
@@ -140,14 +179,14 @@ class Decoder(nn.Module):
                 kernel_init=nn.initializers.xavier_uniform(),
                 bias_init=nn.initializers.normal(stddev=1e-6))(x, encoder_output)
         x = x + encoder_decoder_residual
-        x = nn.LayerNorm()(x)
+        x = nn.FullLayerNorm()(x)
 
         # Pass everything through a feed-forward layer, with
         # residuals and layer normalisation
         feed_forward_residual = x
         x = FeedForward(self.hypers)(x)
         x = x + feed_forward_residual
-        x = nn.LayerNorm()(x)
+        x = nn.FullLayerNorm()(x)
 
         return x
 
@@ -171,6 +210,7 @@ class Transformer(nn.Module):
 
         # Embed the input (includes positional embedding)
         x = TransformerEmbedding(self.hypers, shared_embedding)(x)
+        breakpoint()
 
         # Pass the embedded input through the stack of encoders
         for _ in range(self.hypers.num_encoders):
