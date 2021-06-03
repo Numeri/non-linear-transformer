@@ -31,10 +31,11 @@ class FullLayerNorm(nn.Module):
         Normalized inputs (the same shape as inputs).
         """
         x = np.asarray(x, np.float32)
-        features = x.shape[1:]
-        axes = tuple(np.arange(len(x.shape) - 1) + 1)
-        mean = np.mean(x, axis=axes, keepdims=True)
-        mean2 = np.mean(x*x, axis=axes, keepdims=True)
+        shape = x.shape
+        x = x.reshape((shape[0], -1))
+        features = (x.shape[1],)
+        mean = np.mean(x, axis=-1, keepdims=True)
+        mean2 = np.mean(x*x, axis=-1, keepdims=True)
         var = mean2 - mean*mean
         mul = jax.lax.rsqrt(var + self.epsilon)
         if self.use_scale:
@@ -46,6 +47,7 @@ class FullLayerNorm(nn.Module):
             y = y + np.asarray(
                     self.param('bias', jax.nn.initializers.zeros, features),
                     self.dtype)
+        y = y.reshape(shape)
         return np.asarray(y, self.dtype)
 
 class PositionalEmbedding(nn.Module):
@@ -90,7 +92,6 @@ class TransformerEmbedding(nn.Module):
 
     @nn.compact
     def __call__(self, x : JaxArray) -> JaxArray:
-        breakpoint()
         x = self.shared_embedding(x)
         x = PositionalEmbedding(hypers=self.hypers)(x)
 
@@ -106,7 +107,7 @@ class FeedForward(nn.Module):
 
     @nn.compact
     def __call__(self, x : JaxArray) -> JaxArray:
-        x = nn.Dense(features=self.hypers.d_model,
+        x = nn.Dense(features=4*self.hypers.d_model,
                      kernel_init=nn.initializers.xavier_uniform(),
                      bias_init=nn.initializers.normal(stddev=1e-6))(x)
         x = nn.relu(x)
@@ -134,12 +135,12 @@ class Encoder(nn.Module):
                 kernel_init=nn.initializers.xavier_uniform(),
                 bias_init=nn.initializers.normal(stddev=1e-6))(x, x)
         x = x + multihead_residual
-        x = nn.FullLayerNorm()(x)
+        x = FullLayerNorm()(x)
 
         feed_forward_residual = x
         x = FeedForward(self.hypers)(x)
         x = x + feed_forward_residual
-        x = nn.FullLayerNorm()(x)
+        x = FullLayerNorm()(x)
 
         return x
 
@@ -166,7 +167,7 @@ class Decoder(nn.Module):
                 kernel_init=nn.initializers.xavier_uniform(),
                 bias_init=nn.initializers.normal(stddev=1e-6))(x, x, decoder_mask)
         x = x + multihead_residual
-        x = nn.FullLayerNorm()(x)
+        x = FullLayerNorm()(x)
 
         # Compute the encoder-decoder attention
         # Encoder provides the values and the keys
@@ -179,14 +180,14 @@ class Decoder(nn.Module):
                 kernel_init=nn.initializers.xavier_uniform(),
                 bias_init=nn.initializers.normal(stddev=1e-6))(x, encoder_output)
         x = x + encoder_decoder_residual
-        x = nn.FullLayerNorm()(x)
+        x = FullLayerNorm()(x)
 
         # Pass everything through a feed-forward layer, with
         # residuals and layer normalisation
         feed_forward_residual = x
         x = FeedForward(self.hypers)(x)
         x = x + feed_forward_residual
-        x = nn.FullLayerNorm()(x)
+        x = FullLayerNorm()(x)
 
         return x
 
