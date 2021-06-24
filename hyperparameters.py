@@ -13,6 +13,7 @@ class Hyperparameters:
     checkpoint_every : int
     log_every : int
     deterministic : bool
+    dropout_rate : float
     training_attn_dropout : float
 
     # Model parameters
@@ -44,10 +45,11 @@ hypers = Hyperparameters(batch_size            = 100,
                          epochs                = 1,
                          checkpoint_every      = 500,
                          log_every             = 20,
-                         deterministic         = True,
-                         training_attn_dropout = 0.05,
+                         deterministic         = False,
+                         dropout_rate          = 0.10,
+                         training_attn_dropout = 0.10,
 
-                         d_model               = 512 // 2,
+                         d_model               = 512,
                          seq_length            = 50,
                          vocabulary_size       = 20000,
                          extra_tokens          = [],

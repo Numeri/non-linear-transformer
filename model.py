@@ -111,9 +111,13 @@ class FeedForward(nn.Module):
                      kernel_init=nn.initializers.xavier_uniform(),
                      bias_init=nn.initializers.normal(stddev=1e-6))(x)
         x = nn.relu(x)
+        x = nn.Dropout(rate=self.hypers.dropout_rate,
+                       deterministic=self.hypers.deterministic)(x)
         x = nn.Dense(features=self.hypers.d_model,
                      kernel_init=nn.initializers.xavier_uniform(),
                      bias_init=nn.initializers.normal(stddev=1e-6))(x)
+        x = nn.Dropout(rate=self.hypers.dropout_rate,
+                       deterministic=self.hypers.deterministic)(x)
 
         return x
 
@@ -211,7 +215,6 @@ class Transformer(nn.Module):
 
         # Embed the input (includes positional embedding)
         x = TransformerEmbedding(self.hypers, shared_embedding)(x)
-        breakpoint()
 
         # Pass the embedded input through the stack of encoders
         for _ in range(self.hypers.num_encoders):
